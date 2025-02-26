@@ -5,6 +5,8 @@ Effectively, a keyed lock functions as a temporary FIFO task queue per key. The 
 
 A plausible use case is batch-processing Kafka messages from the same partition, where each message is linked to an entity-specific key (e.g., a User Account ID). By using a keyed lock, messages with the **same key** can be processed **sequentially**, while still leveraging Kafka’s client support for batch processing. This prevents race conditions when concurrent execution of same-key messages could lead to inconsistencies.
 
+This package extends [zero-overhead-promise-lock](https://www.npmjs.com/package/zero-overhead-promise-lock) by adding support for keyed locking. If your use case involves only a few fixed keys for tasks known at compile time (e.g., bulk writes to a database), using multiple instances of the non-keyed lock may be a viable alternative.
+
 ## Table of Contents
 
 * [Key Features](#key-features)
@@ -26,7 +28,7 @@ A plausible use case is batch-processing Kafka messages from the same partition,
 - __Even-Driven Eviction of Stale Keys__: Automatically removes internal locks for keys with no pending or ongoing tasks, ensuring the lock never retains stale keys.
 - __Comprehensive documentation :books:__: Fully documented to provide rich IDE tooltips and enhance the development experience.
 - __Thoroughly Tested :test_tube:__: Covered by extensive unit tests to ensure reliability.
-- __Minimal External Dependencies__: Internally manages multiple instances of [zero-overhead-promise-lock](https://www.npmjs.com/package/zero-overhead-promise-lock), one per active key. This package focuses on efficient resource management while leveraging a well-tested foundation. Both packages are maintained by the same author :blue_heart:, with all other dependencies limited to development.
+- __Minimal External Dependencies__: Internally manages multiple instances of [zero-overhead-promise-lock](https://www.npmjs.com/package/zero-overhead-promise-lock), one per active key. This package focuses on efficient resource management while leveraging a well-tested foundation. Both packages are maintained by the same author :blue_heart:, and all other dependencies are dev-only.
 - __ES2020 Compatibility__: The `tsconfig` target is set to ES2020.
 - TypeScript support.
 
@@ -83,10 +85,10 @@ export class StockOrdersConsumer {
     // Register all batch orders simultaneously, then wait for their completion.
     for (const { value, key } of orderMessages) {
       const order: IStockOrder = JSON.parse(value.toString());
-      const key = key.toString();
+      const userID = key.toString();
       // The `executeExclusive` method returns a Promise, but we don't await
       // it here, as the individual task completion is not relevant.
-      userLock.executeExclusive(key, () => this._processOrder(order));
+      userLock.executeExclusive(userID, () => this._processOrder(order));
     }
 
     // Graceful teardown is not only important during application shutdowns;
@@ -131,11 +133,14 @@ export class StockOrdersConsumer {
     // to avoid backpressure.
     for (const { value, key } of orderMessages) {
       const order: IStockOrder = JSON.parse(value.toString());
-      const key = key.toString();
+      const userID = key.toString();
 
       await semaphore.startExecution(async (): Promise<void> => {
-        const alreadyActive = userLock.isActiveKey(key);
-        const executeExclusivePromise = userLock.executeExclusive(key, () => this._processOrder(order));
+        const alreadyActive = userLock.isActiveKey(userID);
+        const executeExclusivePromise = userLock.executeExclusive(
+          userID,
+          (): Promise<void> => this._processOrder(order)
+        );
         if (alreadyActive) {
           // No need to await; this key already occupies capacity in the semaphore.
           return;
@@ -143,7 +148,6 @@ export class StockOrdersConsumer {
 
         await executeExclusivePromise;
       });
-      
     }
 
     // Graceful teardown is not only important during application shutdowns;
