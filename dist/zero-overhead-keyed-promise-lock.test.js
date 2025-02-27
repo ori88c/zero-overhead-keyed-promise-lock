@@ -122,6 +122,16 @@ describe('ZeroOverheadLock tests', () => {
         });
     });
     describe('Negative path tests', () => {
+        test('executeExclusive: should reject with an error when key is empty', async () => {
+            const lock = new zero_overhead_keyed_promise_lock_1.ZeroOverheadKeyedLock();
+            const createTask = () => Promise.resolve('mock-result');
+            await expect(lock.executeExclusive('', createTask)).rejects.toThrow();
+            await expect(lock.executeExclusive(0, createTask)).rejects.toThrow();
+            await expect(lock.executeExclusive(undefined, createTask)).rejects.toThrow();
+            expect(lock.activeKeysCount).toBe(0);
+            expect(lock.activeKeys).toEqual([]);
+            await lock.waitForAllExistingTasksToComplete();
+        });
         test('executeExclusive: should return the expected error when throws', async () => {
             const lock = new zero_overhead_keyed_promise_lock_1.ZeroOverheadKeyedLock();
             const key = 'mock-key';

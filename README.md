@@ -129,25 +129,23 @@ export class StockOrdersConsumer {
     const semaphore = new ZeroBackpressureSemaphore<void>();
     const userLock = new ZeroOverheadKeyedLock<void>();
 
-    // Register a new order only when the semaphore indicates availability,
-    // to avoid backpressure.
     for (const { value, key } of orderMessages) {
       const order: IStockOrder = JSON.parse(value.toString());
       const userID = key.toString();
+      const alreadyActive = userLock.isActiveKey(userID);
+      const executeExclusive = () => userLock.executeExclusive(
+        userID,
+        () => this._processOrder(order)
+      );
+      if (alreadyActive) {
+        // No need to await; this key already occupies capacity in the semaphore.
+        // In other words, the semaphore is currently processing a previous order
+        // belonging to the current userID.
+        executeExclusive();
+        continue;
+      }
 
-      await semaphore.startExecution(async (): Promise<void> => {
-        const alreadyActive = userLock.isActiveKey(userID);
-        const executeExclusivePromise = userLock.executeExclusive(
-          userID,
-          (): Promise<void> => this._processOrder(order)
-        );
-        if (alreadyActive) {
-          // No need to await; this key already occupies capacity in the semaphore.
-          return;
-        }
-
-        await executeExclusivePromise;
-      });
+      await semaphore.startExecution(executeExclusive);
     }
 
     // Graceful teardown is not only important during application shutdowns;
