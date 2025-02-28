@@ -126,7 +126,7 @@ export class StockOrdersConsumer {
   private async _handleBatch(payload: EachBatchPayload): Promise<void> {
     const orderMessages = payload.batch.messages;
 
-    const semaphore = new ZeroBackpressureSemaphore<void>();
+    const semaphore = new ZeroBackpressureSemaphore<void>(MAX_BATCH_CONCURRENCY);
     const userLock = new ZeroOverheadKeyedLock<void>();
 
     for (const { value, key } of orderMessages) {
@@ -161,6 +161,52 @@ export class StockOrdersConsumer {
 ```
 
 It is crucial to avoid resolving a batch handler **too early**. Once the batch handler resolves, the Kafka client updates the processed offsets. If a message handler resolves before processing is fully completed, and the container crashes before all batch messages are handled, Kafka **may not reassign those messages to another consumer**, leading to potential data loss.
+
+#### Graceful Shutdown Strategy for StockOrdersConsumer
+
+Note that the examples above implement a graceful teardown only for the batch handling method, not for the `StockOrdersConsumer` component itself. Implementing a full teardown for `StockOrdersConsumer` can be challenging, as locks and/or semaphores are created and disposed per batch.
+
+A feasible approach is to introduce a private `_activeLocks` property to track currently active locks. Then, a dedicated teardown method (e.g., `onDestroy`, `onShutdown`, `terminate`) can invoke the locks' graceful teardown mechanism, ensuring a **deterministic** shutdown.  
+Consider the following adaptation, which abstracts away irrelevant details:
+```ts
+import { ZeroOverheadKeyedLock } from 'zero-overhead-keyed-promise-lock';
+import { ZeroBackpressureSemaphore } from 'zero-backpressure-semaphore-typescript';
+import { Kafka, Consumer, EachBatchPayload } from 'kafkajs';
+import { IStockOrder } from './stock-order.interfaces';
+
+export class StockOrdersConsumer {
+  private readonly _activeLocks = new Set<ZeroOverheadKeyedLock<void>>();
+
+  // Initialization methods are omitted for brevity in this example.
+
+  public async startConsuming(): Promise<void> {
+    // Implementation goes here.
+  }
+
+  public async onDestroy(): Promise<void> {
+    await this._consumer.disconnect();
+
+    // Message event handlers may still be executing.
+    while (this._activeLocks.size > 0) {
+      const locks = Array.from(this._activeLocks.keys());
+      const waitForCompletionPromises = locks.map(lock => lock.waitForAllExistingTasksToComplete());
+      await Promise.all(waitForCompletionPromises);
+    }
+  }
+
+  private async _handleBatch(payload: EachBatchPayload): Promise<void> {
+    const userLock = new ZeroOverheadKeyedLock<void>();
+    this._activeLocks.add(userLock);
+
+    // Implementation goes here.
+
+    await userLock.waitForAllExistingTasksToComplete();
+    this._activeLocks.delete(userLock);
+  }
+}
+```
+
+Note that a single Kafka consumer may be subscribed to multiple partitions and might perform batch processing for each. Refer to the `partitionsConsumedConcurrently` attribute in the 'kafkajs' package for more details.
 
 ## Race Conditions: How Are They Possible in Single-Threaded JavaScript? :checkered_flag:<a id="race-conditions"></a>
 
