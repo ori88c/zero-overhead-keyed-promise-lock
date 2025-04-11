@@ -62,8 +62,6 @@
 export declare class ZeroOverheadKeyedLock<T> {
     private readonly _keyToLock;
     /**
-     * activeKeysCount
-     *
      * Returns the number of currently active keys. An active key is associated
      * with an ongoing (not yet completed) task.
      * The time complexity of this operation is O(1).
@@ -72,8 +70,6 @@ export declare class ZeroOverheadKeyedLock<T> {
      */
     get activeKeysCount(): number;
     /**
-     * activeKeys
-     *
      * Returns an array of currently active keys. An active key is associated
      * with an ongoing (not yet completed) task.
      * The time complexity of this operation is O(active-keys).
@@ -82,8 +78,6 @@ export declare class ZeroOverheadKeyedLock<T> {
      */
     get activeKeys(): string[];
     /**
-     * isActiveKey
-     *
      * Indicates whether the provided key is currently associated with an ongoing task
      * (i.e., the task is not yet completed).
      * The time complexity of this operation is O(1).
@@ -99,8 +93,6 @@ export declare class ZeroOverheadKeyedLock<T> {
      */
     isActiveKey(key: string): boolean;
     /**
-     * executeExclusive
-     *
      * Executes a given task exclusively, ensuring that only one task associated with the same key
      * can run at a time. It resolves or rejects when the task finishes execution, returning the
      * task's value or propagating any error it may throw.
@@ -122,17 +114,46 @@ export declare class ZeroOverheadKeyedLock<T> {
      * A keyed lock ensures sequential processing of same-key messages during batch processing, e.g.,
      * by using the UserID as the key to avoid concurrent operations on the same user account.
      *
-     * @param key - A non-empty string key associated with the task. For example, the UserID is a
-     *              suitable key to ensure sequential operations on a user account.
-     * @param criticalTask - The asynchronous task to execute exclusively, ensuring it does not
-     *                       overlap with any other execution associated with the same key.
-     * @throws - Error thrown by the task itself.
+     * @param key A non-empty string key associated with the task. For example, the UserID is a
+     *            suitable key to ensure sequential operations on a user account.
+     * @param criticalTask The asynchronous task to execute exclusively, ensuring it does not
+     *                     overlap with any other execution associated with the same key.
+     * @throws Error thrown by the task itself.
      * @returns A promise that resolves with the task's return value or rejects with its error.
      */
     executeExclusive(key: string, criticalTask: () => Promise<T>): Promise<T>;
     /**
-     * waitForAllExistingTasksToComplete
+     * Exposes the currently executing task's promise for a specific key, if one is active.
+     * Note that the returned promise may throw if the active task encounters an error.
      *
+     * ### Smart Reuse
+     * This property is useful in scenarios where launching a duplicate task is wasteful.
+     * Instead of scheduling a new task, consumers can **await the ongoing execution** to
+     * avoid redundant operations.
+     *
+     * ### Usage Example
+     * For example, assume a Kafka message handler receives an event to provision an account
+     * for a newly onboarded user. Since this operation should not be duplicated, you may
+     * choose to wait for the current task to complete, if one is already in progress:
+     * ```
+     * const ongoing = onboardingLock.getCurrentExecution(userID);
+     * if (ongoing) {
+     *   await ongoing;
+     * } else {
+     *   await onboardingLock.executeExclusive(userID, onboardUserTask);
+     * }
+     * ```
+     * #### Important Consideration
+     * Please note that regardless of the scope of this example, an onboarding operation
+     * should be implemented in an idempotent manner, even with this optimization.
+     * In other words, developers should always account for the possibility of redundant executions.
+     *
+     * @param key A non-empty string key associated with the task.
+     * @returns The currently executing task’s promise for the specified key, or `undefined`
+     *          if no task is currently executing for that key.
+     */
+    getCurrentExecution(key: string): Promise<T> | undefined;
+    /**
      * Waits for the completion of all tasks that are *currently* pending or executing.
      *
      * This method is particularly useful in scenarios where it is essential to ensure that
@@ -157,5 +178,7 @@ export declare class ZeroOverheadKeyedLock<T> {
      *          of invocation are completed.
      */
     waitForAllExistingTasksToComplete(): Promise<void>;
-    private _getLock;
+    private _validateKey;
+    private _getOrCreateLock;
+    private _getLockIfExists;
 }

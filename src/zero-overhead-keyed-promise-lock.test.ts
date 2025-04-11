@@ -46,6 +46,7 @@ describe('ZeroOverheadLock tests', () => {
 
       // Pre-action validations.
       expect(lock.isActiveKey(key)).toBe(false);
+      expect(lock.getCurrentExecution(key)).toBeUndefined();
       expect(lock.activeKeysCount).toBe(0);
       expect(lock.activeKeys).toEqual([]);
 
@@ -55,6 +56,7 @@ describe('ZeroOverheadLock tests', () => {
       // Post-action validations.
       expect(actualValue).toBe(expectedValue);
       expect(lock.isActiveKey(key)).toBe(false);
+      expect(lock.getCurrentExecution(key)).toBeUndefined();
       expect(lock.activeKeysCount).toBe(0);
       expect(lock.activeKeys).toEqual([]);
     });
@@ -62,6 +64,7 @@ describe('ZeroOverheadLock tests', () => {
     test('waitForAllExistingTasksToComplete: should resolve immediately if no task currently executes', async () => {
       const lock = new ZeroOverheadKeyedLock<void>();
       await lock.waitForAllExistingTasksToComplete();
+      expect(lock.getCurrentExecution('mock_key')).toBeUndefined();
       expect(lock.activeKeysCount).toBe(0);
     });
 
@@ -86,6 +89,13 @@ describe('ZeroOverheadLock tests', () => {
       const validateKeysActivity = (shouldBePresent: boolean): void => {
         for (const key of keys) {
           expect(lock.isActiveKey(key)).toBe(shouldBePresent);
+
+          const currentExecutionPromise = lock.getCurrentExecution(key);
+          if (shouldBePresent) {
+            expect(currentExecutionPromise).toBeDefined();
+          } else {
+            expect(currentExecutionPromise).toBeUndefined();
+          }
         }
       };
 
@@ -144,16 +154,66 @@ describe('ZeroOverheadLock tests', () => {
       validateKeysActivity(false);
       jest.useRealTimers();
     });
+
+    test('getCurrentExecution should return the active task promise during execution', async () => {
+      type ResultType = Record<string, number>;
+      const mockResult: ResultType = { a: 1, b: 2 };
+
+      let resolveTask: (value?: unknown) => void;
+      const lock = new ZeroOverheadKeyedLock<ResultType>();
+      const key = 'mock-key';
+
+      const taskPromise = new Promise<ResultType>(res => resolveTask = res);
+      const executeExclusivePromise = lock.executeExclusive(key, () => taskPromise);
+
+      const validationRounds = 24;
+      let currentExecution: Promise<ResultType>;
+      for (let attempt = 0; attempt < validationRounds; ++attempt) {
+        expect(lock.isActiveKey(key)).toBe(true);
+
+        // getCurrentExecution should return the same Promise instance as long as
+        // the current task is ongoing.
+        if (currentExecution) {
+          expect(lock.getCurrentExecution(key)).toBe(currentExecution);
+        } else {
+          currentExecution = lock.getCurrentExecution(key);
+          expect(currentExecution).toBeDefined();
+        }
+
+        expect(lock.activeKeysCount).toBe(1);
+        expect(lock.activeKeys).toEqual([key]);
+      }
+
+      resolveTask(mockResult);
+      const result = await executeExclusivePromise;
+      expect(result).toBe(mockResult);
+
+      expect(lock.activeKeysCount).toBe(0);
+      expect(lock.activeKeys).toEqual([]);
+      expect(lock.isActiveKey(key)).toBe(false);
+      expect(lock.getCurrentExecution(key)).toBeUndefined();
+    });
   });
 
   describe('Negative path tests', () => {
-    test('executeExclusive: should reject with an error when key is empty', async () => {
+    test('executeExclusive & getCurrentExecution: should reject when the key is empty or not a string', async () => {
       const lock = new ZeroOverheadKeyedLock<string>();
       const createTask = () => Promise.resolve<string>('mock-result');
+      const invalidKeys = [
+        '',
+        0 as unknown as string,
+        4 as unknown as string,
+        -53.431 as unknown as string,
+        undefined as string,
+        null as string,
+        true as unknown as string,
+        { prop1: 'value1' } as unknown as string
+      ];
 
-      await expect(lock.executeExclusive('', createTask)).rejects.toThrow();
-      await expect(lock.executeExclusive(0 as unknown as string, createTask)).rejects.toThrow();
-      await expect(lock.executeExclusive(undefined as string, createTask)).rejects.toThrow();
+      for (const key of invalidKeys) {
+        await expect(() => lock.executeExclusive(key, createTask)).rejects.toThrow();
+        expect(() => lock.getCurrentExecution(key)).toThrow();
+      }
 
       expect(lock.activeKeysCount).toBe(0);
       expect(lock.activeKeys).toEqual([]);
@@ -166,11 +226,16 @@ describe('ZeroOverheadLock tests', () => {
       const expectedError = new Error('mock error');
       const createTask = async (): Promise<string> => { throw expectedError; };
 
-      expect.assertions(3);
+      expect.assertions(5);
       try {
         await lock.executeExclusive(key, createTask);
       } catch (err) {
         expect(err).toBe(expectedError);
+
+        // The event-driven eviction mechanism should remove the key after the task completes,
+        // as long as no other task is pending (i.e., no backpressure).
+        expect(lock.isActiveKey(key)).toBe(false);
+        expect(lock.getCurrentExecution(key)).toBeUndefined();
       }
 
       expect(lock.activeKeysCount).toBe(0);
@@ -201,6 +266,13 @@ describe('ZeroOverheadLock tests', () => {
       const validateKeysActivity = (shouldBePresent: boolean): void => {
         for (const key of keys) {
           expect(lock.isActiveKey(key)).toBe(shouldBePresent);
+
+          const currentExecutionPromise = lock.getCurrentExecution(key);
+          if (shouldBePresent) {
+            expect(currentExecutionPromise).toBeDefined();
+          } else {
+            expect(currentExecutionPromise).toBeUndefined();
+          }
         }
       };
 

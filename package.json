@@ -1,6 +1,6 @@
 {
   "name": "zero-overhead-keyed-promise-lock",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "An efficient keyed Promise lock for Node.js projects, ensuring the mutually exclusive execution of tasks associated with the same key. Key features include active key metrics and the ability to gracefully await the completion of all currently executing or pending tasks, making it ideal for robust production applications requiring smooth teardown.",
   "repository": {
     "type": "git",
@@ -42,6 +42,11 @@
     "deterministic-termination",
     "check-and-abort",
     "active-key",
+    "access-ongoing-task",
+    "access-executing-promise",
+    "smart-reuse",
+    "avoid-redundant-executions",
+    "advanced-usage-patterns",
     "batch-processing",
     "deterministic-batch-completion",
     "throttle",
@@ -56,7 +61,7 @@
     "node": ">=14.5.0"
   },
   "dependencies": {
-    "zero-overhead-promise-lock": "^1.1.2"
+    "zero-overhead-promise-lock": "^1.2.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
