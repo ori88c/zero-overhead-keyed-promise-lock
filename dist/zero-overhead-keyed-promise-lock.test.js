@@ -27,15 +27,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * Given that resilience is the primary goal, this is a small price to pay.
  */
 const zero_overhead_keyed_promise_lock_1 = require("./zero-overhead-keyed-promise-lock");
-const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-describe('ZeroOverheadLock tests', () => {
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+describe('ZeroOverheadKeyedLock tests', () => {
     describe('Happy path tests', () => {
         test('executeExclusive: should return the expected value when succeeds', async () => {
             // Arrange.
             const lock = new zero_overhead_keyed_promise_lock_1.ZeroOverheadKeyedLock();
             const key = 'user-9799789';
             const expectedValue = -295;
-            const task = async () => { return expectedValue; };
+            const task = async () => {
+                return expectedValue;
+            };
             // Pre-action validations.
             expect(lock.isActiveKey(key)).toBe(false);
             expect(lock.getCurrentExecution(key)).toBeUndefined();
@@ -56,6 +58,7 @@ describe('ZeroOverheadLock tests', () => {
             expect(lock.getCurrentExecution('mock_key')).toBeUndefined();
             expect(lock.activeKeysCount).toBe(0);
         });
+        // prettier-ignore
         test('executeExclusive: should process only one task at a time per key, and waitForAllExistingTasksToComplete ' +
             'should resolve only after *all* the currently pending and processed tasks are completed', async () => {
             jest.useFakeTimers();
@@ -64,7 +67,7 @@ describe('ZeroOverheadLock tests', () => {
             const keys = new Array(numberOfKeys)
                 .fill(0)
                 .map((_, i) => i * 20)
-                .map(num => `user-${num}`);
+                .map((num) => `user-${num}`);
             const roundToExecuteExclusivePromises = [];
             const initialBackpressurePerKey = 15;
             const taskDurationMs = 8000;
@@ -92,7 +95,7 @@ describe('ZeroOverheadLock tests', () => {
             // Create a burst of tasks, inducing backpressure on the lock.
             // Add `initialBackpressurePerKey` pending tasks per key.
             for (let round = 0; round < initialBackpressurePerKey; ++round) {
-                const pendingExecuteExclusivePromises = keys.map(key => lock.executeExclusive(key, createTask));
+                const pendingExecuteExclusivePromises = keys.map((key) => lock.executeExclusive(key, createTask));
                 roundToExecuteExclusivePromises.push(pendingExecuteExclusivePromises);
                 // Trigger an event-loop iteration.
                 await jest.advanceTimersByTimeAsync(0);
@@ -112,11 +115,11 @@ describe('ZeroOverheadLock tests', () => {
                 expect(lock.activeKeysCount).toBe(keys.length);
                 expect(lock.activeKeys).toEqual(keys);
                 validateKeysActivity(true);
-                // Simulate the completion of one task per key. This occurs because all tasks 
+                // Simulate the completion of one task per key. This occurs because all tasks
                 // have the same duration, and each key has an equal number of remaining tasks.
                 await Promise.race([
                     waitForCompletionOfAllTasksPromise,
-                    jest.advanceTimersByTimeAsync(taskDurationMs)
+                    jest.advanceTimersByTimeAsync(taskDurationMs),
                 ]);
                 await Promise.all(roundToExecuteExclusivePromises[round]);
                 // Each round, we complete one pending task per key.
@@ -135,7 +138,7 @@ describe('ZeroOverheadLock tests', () => {
             let resolveTask;
             const lock = new zero_overhead_keyed_promise_lock_1.ZeroOverheadKeyedLock();
             const key = 'mock-key';
-            const taskPromise = new Promise(res => resolveTask = res);
+            const taskPromise = new Promise((res) => (resolveTask = res));
             const executeExclusivePromise = lock.executeExclusive(key, () => taskPromise);
             const validationRounds = 24;
             let currentExecution;
@@ -174,7 +177,7 @@ describe('ZeroOverheadLock tests', () => {
                 undefined,
                 null,
                 true,
-                { prop1: 'value1' }
+                { prop1: 'value1' },
             ];
             for (const key of invalidKeys) {
                 await expect(() => lock.executeExclusive(key, createTask)).rejects.toThrow();
@@ -188,7 +191,9 @@ describe('ZeroOverheadLock tests', () => {
             const lock = new zero_overhead_keyed_promise_lock_1.ZeroOverheadKeyedLock();
             const key = 'mock-key';
             const expectedError = new Error('mock error');
-            const createTask = async () => { throw expectedError; };
+            const createTask = async () => {
+                throw expectedError;
+            };
             expect.assertions(5);
             try {
                 await lock.executeExclusive(key, createTask);
@@ -204,6 +209,7 @@ describe('ZeroOverheadLock tests', () => {
             expect(lock.activeKeys).toEqual([]);
             await lock.waitForAllExistingTasksToComplete();
         });
+        // prettier-ignore
         test('executeExclusive: should process only one task at a time per key, and waitForAllExistingTasksToComplete ' +
             'should resolve only after *all* the currently pending and processed tasks are completed, ' +
             'with all tasks rejecting', async () => {
@@ -213,7 +219,7 @@ describe('ZeroOverheadLock tests', () => {
             const keys = new Array(numberOfKeys)
                 .fill(0)
                 .map((_, i) => i * 25)
-                .map(num => `user-${num}`);
+                .map((num) => `user-${num}`);
             const roundToExecuteExclusivePromises = [];
             const initialBackpressurePerKey = 12;
             const taskDurationMs = 6000;
@@ -241,7 +247,7 @@ describe('ZeroOverheadLock tests', () => {
             // Create a burst of tasks, inducing backpressure on the lock.
             // Add `initialBackpressurePerKey` pending tasks per key.
             for (let round = 0; round < initialBackpressurePerKey; ++round) {
-                const pendingExecuteExclusivePromises = keys.map(key => lock.executeExclusive(key, () => task({ round, key })));
+                const pendingExecuteExclusivePromises = keys.map((key) => lock.executeExclusive(key, () => task({ round, key })));
                 roundToExecuteExclusivePromises.push(pendingExecuteExclusivePromises);
                 // Trigger an event-loop iteration.
                 await jest.advanceTimersByTimeAsync(0);
@@ -260,11 +266,11 @@ describe('ZeroOverheadLock tests', () => {
                 expect(lock.activeKeysCount).toBe(keys.length);
                 expect(lock.activeKeys).toEqual(keys);
                 validateKeysActivity(true);
-                // Simulate the completion of one task per key. This occurs because all tasks 
+                // Simulate the completion of one task per key. This occurs because all tasks
                 // have the same duration, and each key has an equal number of remaining tasks.
                 await Promise.allSettled([
                     ...roundToExecuteExclusivePromises[round],
-                    jest.advanceTimersByTimeAsync(taskDurationMs)
+                    jest.advanceTimersByTimeAsync(taskDurationMs),
                 ]);
                 // Each round, we complete one pending task per key.
                 let i = 0;

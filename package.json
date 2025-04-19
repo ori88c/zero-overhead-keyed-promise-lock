@@ -1,6 +1,6 @@
 {
   "name": "zero-overhead-keyed-promise-lock",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "An efficient keyed Promise lock for Node.js projects, ensuring the mutually exclusive execution of tasks associated with the same key. Key features include active key metrics and the ability to gracefully await the completion of all currently executing or pending tasks, making it ideal for robust production applications requiring smooth teardown.",
   "repository": {
     "type": "git",
@@ -13,6 +13,7 @@
   "author": "Ori Cohen",
   "license": "Apache-2.0",
   "scripts": {
+    "format": "prettier --write \"src/**/*.ts\"",
     "build": "tsc",
     "prepare": "npm run build",
     "test": "jest"
@@ -61,12 +62,13 @@
     "node": ">=14.5.0"
   },
   "dependencies": {
-    "zero-overhead-promise-lock": "^1.2.0"
+    "zero-overhead-promise-lock": "^1.2.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.5",
+    "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.2"
   },

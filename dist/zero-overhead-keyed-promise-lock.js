@@ -19,8 +19,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ZeroOverheadKeyedLock = void 0;
 const zero_overhead_promise_lock_1 = require("zero-overhead-promise-lock");
 /**
- * ZeroOverheadKeyedLock
- *
  * The `ZeroOverheadKeyedLock` class provides a lightweight Promise-based locking mechanism
  * for Node.js projects, ensuring the mutually exclusive execution of tasks **associated with
  * the same key**.
@@ -211,7 +209,7 @@ class ZeroOverheadKeyedLock {
             return;
         }
         const activeLocks = Array.from(this._keyToLock.values());
-        const waitForCompletionPromises = activeLocks.map(lock => lock.waitForAllExistingTasksToComplete());
+        const waitForCompletionPromises = activeLocks.map((lock) => lock.waitForAllExistingTasksToComplete());
         await Promise.allSettled(waitForCompletionPromises);
     }
     _validateKey(key) {

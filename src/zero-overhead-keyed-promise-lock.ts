@@ -15,20 +15,18 @@
  * limitations under the License.
  */
 
-import { ZeroOverheadLock } from "zero-overhead-promise-lock";
+import { ZeroOverheadLock } from 'zero-overhead-promise-lock';
 
 /**
- * ZeroOverheadKeyedLock
- * 
- * The `ZeroOverheadKeyedLock` class provides a lightweight Promise-based locking mechanism 
- * for Node.js projects, ensuring the mutually exclusive execution of tasks **associated with 
+ * The `ZeroOverheadKeyedLock` class provides a lightweight Promise-based locking mechanism
+ * for Node.js projects, ensuring the mutually exclusive execution of tasks **associated with
  * the same key**.
- * 
- * Each task is identified by a non-empty string key. If a task is submitted while another 
- * task with the same key is still executing, it will be queued and executed only after all 
- * previously pending tasks for that key have completed (whether resolved or rejected). 
+ *
+ * Each task is identified by a non-empty string key. If a task is submitted while another
+ * task with the same key is still executing, it will be queued and executed only after all
+ * previously pending tasks for that key have completed (whether resolved or rejected).
  * Effectively, each key maintains a FIFO queue, ensuring that tasks execute sequentially.
- * 
+ *
  * ### Race Conditions: How Are They Possible in Single-Threaded JavaScript?
  * In Node.js, synchronous code blocks - those that do *not* contain an `await` keyword - are
  * guaranteed to execute within a single event-loop iteration. These blocks inherently do not
@@ -39,21 +37,21 @@ import { ZeroOverheadLock } from "zero-overhead-promise-lock";
  * executions could result in an inconsistent or invalid state.
  * In this regard, JavaScript's single-threaded nature differs inherently from that of
  * single-threaded C code, for example.
- * 
+ *
  * ### Under the Hood
- * Implementation-wise, the keyed lock maintains a map from each key to its corresponding 
- * (non-keyed) lock. In other words, this component **leverages a well-tested**, simpler 
+ * Implementation-wise, the keyed lock maintains a map from each key to its corresponding
+ * (non-keyed) lock. In other words, this component **leverages a well-tested**, simpler
  * building block while focusing on key management.
  * Locks associated with unused keys are automatically removed in an event-driven manner,
  * as a post-processing step after each critical section execution.
- * 
+ *
  * ### Modern API Design
  * Traditional lock APIs require explicit acquire and release steps, adding overhead and
  * responsibility on the user.
  * In contrast, `ZeroOverheadKeyedLock` manages task execution, abstracting away these details
  * and reducing user responsibility. The acquire and release steps are handled implicitly by the
  * execution method, reminiscent of the RAII idiom in C++.
- * 
+ *
  * ### Graceful Teardown
  * Task execution promises are tracked by the lock instance, ensuring no dangling promises.
  * This enables graceful teardown via the `waitForAllExistingTasksToComplete` method, in
@@ -69,7 +67,7 @@ export class ZeroOverheadKeyedLock<T> {
    * Returns the number of currently active keys. An active key is associated
    * with an ongoing (not yet completed) task.
    * The time complexity of this operation is O(1).
-   * 
+   *
    * @returns The number of currently active keys.
    */
   public get activeKeysCount(): number {
@@ -80,7 +78,7 @@ export class ZeroOverheadKeyedLock<T> {
    * Returns an array of currently active keys. An active key is associated
    * with an ongoing (not yet completed) task.
    * The time complexity of this operation is O(active-keys).
-   * 
+   *
    * @returns An array of currently active keys.
    */
   public get activeKeys(): string[] {
@@ -91,12 +89,12 @@ export class ZeroOverheadKeyedLock<T> {
    * Indicates whether the provided key is currently associated with an ongoing task
    * (i.e., the task is not yet completed).
    * The time complexity of this operation is O(1).
-   * 
+   *
    * ### Check-and-Abort Friendly
    * This property is particularly useful in "check and abort" scenarios, where an
    * operation should be skipped or aborted if the key is currently held by another
    * task.
-   * 
+   *
    * @param key A non-empty string representing the key associated with a task.
    * @returns `true` if there is an active (ongoing) task associated with the
    *          given key, `false` otherwise.
@@ -109,12 +107,12 @@ export class ZeroOverheadKeyedLock<T> {
    * Executes a given task exclusively, ensuring that only one task associated with the same key
    * can run at a time. It resolves or rejects when the task finishes execution, returning the
    * task's value or propagating any error it may throw.
-   * 
+   *
    * If a task is submitted while another task with the same key is still executing, it will
    * be queued and executed only after all previously pending tasks for that key have completed
-   * (whether resolved or rejected). 
+   * (whether resolved or rejected).
    * Effectively, each key maintains a FIFO queue, ensuring that tasks execute sequentially.
-   * 
+   *
    * ### Real-World Example: Batch Processing of Kafka Messages
    * Suppose you are consuming a batch of Kafka messages from the same partition concurrently, but
    * need to ensure sequential processing for messages associated with the same key. For example,
@@ -126,10 +124,10 @@ export class ZeroOverheadKeyedLock<T> {
    * count.
    * A keyed lock ensures sequential processing of same-key messages during batch processing, e.g.,
    * by using the UserID as the key to avoid concurrent operations on the same user account.
-   * 
+   *
    * @param key A non-empty string key associated with the task. For example, the UserID is a
    *            suitable key to ensure sequential operations on a user account.
-   * @param criticalTask The asynchronous task to execute exclusively, ensuring it does not 
+   * @param criticalTask The asynchronous task to execute exclusively, ensuring it does not
    *                     overlap with any other execution associated with the same key.
    * @throws Error thrown by the task itself.
    * @returns A promise that resolves with the task's return value or rejects with its error.
@@ -199,7 +197,7 @@ export class ZeroOverheadKeyedLock<T> {
    * The returned promise only accounts for tasks registered at the time this method is called.
    * If this method is being used as part of a graceful shutdown process, the **caller must ensure**
    * that no additional tasks are registered after this method is called.
-   * If there is any uncertainty about new tasks being registered, consider using the following pattern: 
+   * If there is any uncertainty about new tasks being registered, consider using the following pattern:
    * ```ts
    * while (lock.activeKeysCount > 0) {
    *   await lock.waitForAllExistingTasksToComplete()
@@ -215,7 +213,9 @@ export class ZeroOverheadKeyedLock<T> {
     }
 
     const activeLocks = Array.from(this._keyToLock.values());
-    const waitForCompletionPromises = activeLocks.map(lock => lock.waitForAllExistingTasksToComplete());
+    const waitForCompletionPromises = activeLocks.map((lock) =>
+      lock.waitForAllExistingTasksToComplete(),
+    );
     await Promise.allSettled(waitForCompletionPromises);
   }
 

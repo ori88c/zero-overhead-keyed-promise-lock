@@ -15,8 +15,6 @@
  * limitations under the License.
  */
 /**
- * ZeroOverheadKeyedLock
- *
  * The `ZeroOverheadKeyedLock` class provides a lightweight Promise-based locking mechanism
  * for Node.js projects, ensuring the mutually exclusive execution of tasks **associated with
  * the same key**.
